@@ -1,0 +1,44 @@
+name: Deploy to Azure Web App
+on: [push]
+
+env:
+  AZURE_WEBAPP_NAME: as-unidex-demo
+  WEBAPP_ROOTDIR: app
+  WEBAPP_PKGDIR: package
+
+jobs:
+  build_and_deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.SP_Unidex_Deploy_Password }}
+
+      - name: .Net Setup
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '3.1.100'
+
+      - name: Build App
+        shell: bash
+        run: |
+          pushd ${{ env.WEBAPP_ROOTDIR }}
+          dotnet build --configuration Release 
+          dotnet publish -c Release -o './${{ env.WEBAPP_PKGDIR }}'
+          popd
+
+      - name: Deploy App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: '${{ env.WEBAPP_ROOTDIR }}/${{ env.WEBAPP_PKGDIR }}'
+
+      - name: Azure Logout
+        shell: bash
+        run: |
+          az logout
+
