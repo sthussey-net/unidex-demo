@@ -18,11 +18,16 @@ provider "github" {
 provider "random" {
   version = "~> 2.2"
 }
+
+
 # Generate a random password for the deployer SP
 resource "random_password" "deployer-password" {
   length = 24
   special = true
   override_special = "!#$%^&*()"
+}
+
+data "azurerm_client_config" "current" {
 }
 
 # Create the Unidex application
@@ -82,6 +87,7 @@ resource "azurerm_app_service" "as-unidex-demo" {
   site_config {
     dotnet_framework_version = "v4.0"
     use_32_bit_worker_process = true
+    linux_fx_version = "DOTNETCORE|3.1"
   }
 
   identity {
@@ -99,5 +105,18 @@ resource "azurerm_role_assignment" "SP-Unidex-Deploy-Contributor" {
 resource "github_actions_secret" "SP-Unidex-Deploy-Password" {
   repository = var.app-repo
   secret_name = "SP_Unidex_Deploy_Password"
-  plaintext_value = random_password.deployer-password.result
+  plaintext_value = <<EOS
+{
+  "clientId": "${ azuread_service_principal.SP-Unidex-Deploy.application_id }",
+  "clientSecret": "${ random_password.deployer-password.result }",
+  "subscriptionId": "${ data.azurerm_client_config.current.subscription_id }",
+  "tenantId": "${ data.azurerm_client_config.current.tenant_id }",
+  "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
+  "resourceManagerEndpointUrl": "https://management.azure.com/",
+  "activeDirectoryGraphResourceId": "https://graph.windows.net/",
+  "sqlManagementEndpointUrl": "https://management.core.windows.net:8443/",
+  "galleryEndpointUrl": "https://gallery.azure.com/",
+  "managementEndpointUrl": "https://management.core.windows.net/"
+}
+EOS
 }
